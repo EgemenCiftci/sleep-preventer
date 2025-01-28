@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using Timer = System.Threading.Timer;
 
 namespace SleepPreventer;
 
@@ -7,12 +8,18 @@ internal static class Program
     [DllImport("kernel32.dll")]
     private static extern uint SetThreadExecutionState(uint esFlags);
 
+    [DllImport("user32.dll")]
+    private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, uint dwExtraInfo);
+
     private const uint ES_CONTINUOUS = 0x80000000;
     private const uint ES_DISPLAY_REQUIRED = 0x00000002;
     private const uint ES_SYSTEM_REQUIRED = 0x00000001;
-
+    private const byte VK_F15 = 0x7E;
+    private const uint KEYEVENTF_KEYDOWN = 0x0000;
+    private const uint KEYEVENTF_KEYUP = 0x0002;
     private static NotifyIcon? trayIcon;
     private static ContextMenuStrip? trayMenu;
+    private static Timer? keypressTimer;
 
     [STAThread]
     private static void Main()
@@ -21,10 +28,11 @@ internal static class Program
 
         if (!EnableSleepPrevention())
         {
-            _ = MessageBox.Show("Failed to enable sleep prevention.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            return;
+            _ = MessageBox.Show("Failed to prevent sleep. Keypress simulation will start instead.",
+                "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
 
+        StartKeypressSimulation();
         InitializeTrayIcon();
 
         try
@@ -39,7 +47,27 @@ internal static class Program
 
     private static bool EnableSleepPrevention()
     {
-        return SetThreadExecutionState(ES_CONTINUOUS | ES_DISPLAY_REQUIRED | ES_SYSTEM_REQUIRED) != 0;
+        uint result = SetThreadExecutionState(ES_CONTINUOUS | ES_DISPLAY_REQUIRED | ES_SYSTEM_REQUIRED);
+        return result != 0;
+    }
+
+    private static void StartKeypressSimulation()
+    {
+        keypressTimer = new Timer(SimulateKeyPress, null, TimeSpan.Zero, TimeSpan.FromMinutes(1));
+    }
+
+    private static void SimulateKeyPress(object? state)
+    {
+        try
+        {
+            keybd_event(VK_F15, 0, KEYEVENTF_KEYDOWN, 0);
+            keybd_event(VK_F15, 0, KEYEVENTF_KEYUP, 0);
+        }
+        catch (Exception ex)
+        {
+            _ = MessageBox.Show($"Failed to simulate key press: {ex.Message}", "Error",
+                MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
     }
 
     private static void InitializeTrayIcon()
@@ -64,13 +92,11 @@ internal static class Program
 
     private static void CleanupResources()
     {
+        keypressTimer?.Dispose();
         _ = SetThreadExecutionState(ES_CONTINUOUS);
 
-        if (trayMenu != null)
-        {
-            trayMenu.Dispose();
-            trayMenu = null;
-        }
+        trayMenu?.Dispose();
+        trayMenu = null;
 
         if (trayIcon != null)
         {
