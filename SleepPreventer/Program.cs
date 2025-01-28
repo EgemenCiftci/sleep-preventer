@@ -6,46 +6,77 @@ internal static class Program
 {
     [DllImport("kernel32.dll")]
     private static extern uint SetThreadExecutionState(uint esFlags);
+
     private const uint ES_CONTINUOUS = 0x80000000;
     private const uint ES_DISPLAY_REQUIRED = 0x00000002;
     private const uint ES_SYSTEM_REQUIRED = 0x00000001;
 
+    private static NotifyIcon? trayIcon;
+    private static ContextMenuStrip? trayMenu;
 
-    /// <summary>
-    ///  The main entry point for the application.
-    /// </summary>
     [STAThread]
     private static void Main()
     {
         ApplicationConfiguration.Initialize();
 
-        if (SetThreadExecutionState(ES_CONTINUOUS | ES_DISPLAY_REQUIRED | ES_SYSTEM_REQUIRED) == 0)
+        if (!EnableSleepPrevention())
         {
             _ = MessageBox.Show("Failed to enable sleep prevention.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             return;
         }
 
-        NotifyIcon trayIcon = new()
+        InitializeTrayIcon();
+
+        try
+        {
+            Application.Run();
+        }
+        finally
+        {
+            CleanupResources();
+        }
+    }
+
+    private static bool EnableSleepPrevention()
+    {
+        return SetThreadExecutionState(ES_CONTINUOUS | ES_DISPLAY_REQUIRED | ES_SYSTEM_REQUIRED) != 0;
+    }
+
+    private static void InitializeTrayIcon()
+    {
+        trayIcon = new NotifyIcon
         {
             Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath),
             Text = "Sleep Preventer",
             Visible = true
         };
 
-        ContextMenuStrip trayMenu = new();
-
-        _ = trayMenu.Items.Add("Exit", null, (sender, e) =>
-        {
-            _ = SetThreadExecutionState(ES_CONTINUOUS);
-            trayIcon.Visible = false;
-            trayIcon.Dispose();
-            Application.Exit();
-        });
+        trayMenu = new ContextMenuStrip();
+        _ = trayMenu.Items.Add("Exit", null, ExitApplication);
 
         trayIcon.ContextMenuStrip = trayMenu;
+    }
 
-        Application.Run();
+    private static void ExitApplication(object? sender, EventArgs e)
+    {
+        Application.Exit();
+    }
 
+    private static void CleanupResources()
+    {
         _ = SetThreadExecutionState(ES_CONTINUOUS);
+
+        if (trayMenu != null)
+        {
+            trayMenu.Dispose();
+            trayMenu = null;
+        }
+
+        if (trayIcon != null)
+        {
+            trayIcon.Visible = false;
+            trayIcon.Dispose();
+            trayIcon = null;
+        }
     }
 }
