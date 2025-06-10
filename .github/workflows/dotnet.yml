@@ -28,6 +28,3 @@ jobs:
       run: dotnet publish -c Release -o output
     - name: Upload artifact
       uses: actions/upload-artifact@v4
-      with:
-          name: dotnet-project
-          path: ~/SleepPreventer/bin
