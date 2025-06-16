@@ -3,13 +3,13 @@ using Timer = System.Threading.Timer;
 
 namespace SleepPreventer;
 
-internal static class Program
+internal static partial class Program
 {
-    [DllImport("kernel32.dll")]
-    private static extern uint SetThreadExecutionState(uint esFlags);
+    [LibraryImport("kernel32.dll")]
+    private static partial uint SetThreadExecutionState(uint esFlags);
 
-    [DllImport("user32.dll")]
-    private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, uint dwExtraInfo);
+    [LibraryImport("user32.dll")]
+    private static partial void keybd_event(byte bVk, byte bScan, uint dwFlags, uint dwExtraInfo);
 
     private const uint ES_CONTINUOUS = 0x80000000;
     private const uint ES_DISPLAY_REQUIRED = 0x00000002;
@@ -24,6 +24,15 @@ internal static class Program
     [STAThread]
     private static void Main()
     {
+        using Mutex mutex = new(true, "SleepPreventerAppMutex", out bool isNewInstance);
+
+        if (!isNewInstance)
+        {
+            _ = MessageBox.Show("Sleep Preventer is already running.", "Information",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
         ApplicationConfiguration.Initialize();
 
         if (!EnableSleepPrevention())
