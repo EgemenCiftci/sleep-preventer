@@ -1,38 +1,64 @@
 # Sleep Preventer
 
-Sleep Preventer is a lightweight Windows utility that prevents your computer from entering sleep mode or turning off the display. It accomplishes this by using Windows API calls to signal system activity, and as a fallback, simulates a harmless keypress if needed. The application runs in the system tray and can be exited at any time.
+Sleep Preventer is a lightweight Windows tray application that keeps the system awake and prevents the display from turning off.
 
 ## Features
 
-- Prevents system sleep and display turn-off using native Windows APIs.
-- Simulates a keypress (F15, an unused key) as a fallback if API calls fail.
-- Runs silently in the system tray with an easy exit option.
-- Single-instance enforcement to avoid multiple running copies.
+- Prevents sleep and display shutdown through the Windows `SetThreadExecutionState` API.
+- Simulates F15 key-down and key-up events every minute.
+- Runs from the system tray.
+- Prevents a second copy of the application from starting.
+- Restores normal sleep behavior when the application exits.
 
 ## Requirements
 
 - Windows 10 or later
-- [.NET 9.0 SDK or Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/9.0)
-- Windows Forms support
+- [.NET 11 SDK](https://dotnet.microsoft.com/download/dotnet/11.0)
+- Visual Studio 2026 or another IDE that supports .NET 11 Windows Forms projects
 
-## Installation
+## Build and Run
+
+### Visual Studio
 
 1. Clone or download this repository.
-2. Open the solution in Visual Studio 2022 or later.
-3. Build the project (`SleepPreventer`).
-4. Run the application. The icon will appear in the system tray.
+2. Open `SleepPreventer.sln`.
+3. Build the `SleepPreventer` project.
+4. Start the application. Its icon will appear in the system tray.
+
+### Command Line
+
+From the repository root:
+
+```powershell
+dotnet restore
+dotnet run --project .\SleepPreventer\SleepPreventer.csproj
+```
+
+To create a release build:
+
+```powershell
+dotnet build .\SleepPreventer\SleepPreventer.csproj --configuration Release
+```
 
 ## Usage
 
 - The application starts minimized in the system tray.
-- To exit, right-click the tray icon and select **Exit**.
-- If you try to start a second instance, you will be notified, and the new instance will close.
+- Right-click the tray icon and select **Exit** to stop it.
+- Starting a second instance opens an information message and closes the duplicate instance.
 
 ## How It Works
 
-- Uses `SetThreadExecutionState` to prevent sleep and display turn-off.
-- If this fails, it simulates an F15 keypress every minute to keep the system awake.
-- Cleans up resources and restores normal sleep behavior on exit.
+Sleep Preventer enables continuous system and display activity with `SetThreadExecutionState`. It also runs a timer that sends an F15 key-down/key-up event every minute.
+
+F15 is typically an unassigned key and does not perform an application action. If the Windows API call is unavailable or unsuccessful, the app notifies the user and continues with keypress simulation.
+
+On exit, Sleep Preventer stops the timer, disposes the tray resources, and resets the execution state to normal sleep behavior.
+
+## Project Structure
+
+- `SleepPreventer.sln` - Visual Studio solution
+- `SleepPreventer/SleepPreventer.csproj` - .NET 11 Windows Forms project
+- `SleepPreventer/Program.cs` - sleep-prevention, keypress, and tray icon implementation
 
 ## License
 
